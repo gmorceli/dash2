@@ -231,7 +231,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # Auto-refresh sem travar cliques (Streamlit moderno)
 # Se sua versão do Streamlit não tiver st.autorefresh, atualize: pip install -U streamlit
-st.autorefresh(interval=refresh_s * 1000, key="tick")
+#st.autorefresh(interval=refresh_s * 1000, key="tick")
 
 # Atualiza históricos (quando completar 30 min desde o último ponto)
 for i in range(1, 11):
@@ -335,5 +335,5 @@ with tabs[2]:
     st.line_chart(hist.set_index("timestamp")["co2"])
 with tabs[3]:
     st.dataframe(hist.sort_values("timestamp", ascending=False), use_container_width=True)
-time.sleep(refresh_s)
-st.rerun()
+#time.sleep(refresh_s)
+#st.rerun()
