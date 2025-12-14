@@ -215,7 +215,7 @@ if "selected_room" not in st.session_state:
 # Controles / Limiares
 # ---------------------------
 st.markdown(
-    dedent(f"""
+ html_card = dedent(f"""
     <div class="{card_class}">
       <div class="room-title">
         <span>{room['name']}</span>
@@ -242,7 +242,7 @@ st.markdown(
       </div>
     </div>
     """),
-    unsafe_allow_html=True,
+st.markdown(html_card, unsafe_allow_html=True)
 )
 
 # Auto-refresh sem travar cliques (Streamlit moderno)
