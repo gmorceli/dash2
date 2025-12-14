@@ -1,184 +1,336 @@
 # app.py
-# Dashboard fictício para 10 salas (Temperatura, Umidade, CO2)
-# Regra de "piscar em vermelho": temp > 30°C E CO2 > 1000 ppm
+# Dashboard de 10 salas (grid 5x2) + ícones + detalhe com histórico (30 min)
 
 import random
-import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
+import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Dashboard Salas - Clima & CO2", layout="wide")
+# ---------------------------
+# Configuração da página
+# ---------------------------
+st.set_page_config(page_title="Dashboard Salas – Clima & CO₂", layout="wide")
 
-# ---------- CSS (cards + blink) ----------
+# ---------------------------
+# SVGs inline (ícones)
+# ---------------------------
+def svg_icon(kind: str, size: int = 18) -> str:
+    # Ícones simples em SVG (sem dependência externa)
+    if kind == "temp":
+        svg = f"""
+        <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
+          <path d="M14 14.76V5a2 2 0 10-4 0v9.76a4 4 0 104 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M10 14.5V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        """
+    elif kind == "hum":
+        svg = f"""
+        <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2s7 7.2 7 12a7 7 0 11-14 0c0-4.8 7-12 7-12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+        """
+    else:  # co2
+        svg = f"""
+        <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
+          <path d="M4 14c0 4 4 7 8 7s8-3 8-7-4-7-8-7-8 3-8 7Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 12h1.5a1.5 1.5 0 010 3H8v-3Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M16 12h-1.5a1.5 1.5 0 000 3H16v-3Z" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        """
+    return svg
+
+# ---------------------------
+# CSS – grid + cards + blink
+# ---------------------------
 st.markdown(
     """
     <style>
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 14px;
-      }
-      .card {
+      .topbar { margin-bottom: 10px; }
+      .gridwrap { margin-top: 6px; }
+
+      /* Card */
+      .room-card {
         background: #0f1b2d;
-        border: 1px solid rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.10);
         border-radius: 14px;
-        padding: 14px 14px 10px 14px;
-        color: #e9eef7;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.18);
-        min-height: 140px;
+        padding: 12px 12px 10px 12px;
+        box-shadow: 0 10px 26px rgba(0,0,0,0.18);
+        min-height: 150px;
       }
-      .title {
-        font-size: 16px;
-        font-weight: 700;
-        letter-spacing: 0.2px;
+      .room-title {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap: 8px;
+        font-weight: 800;
+        font-size: 15px;
+        color: #e9eef7;
         margin-bottom: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
       }
       .badge {
-        font-size: 12px;
-        padding: 4px 10px;
+        font-size: 11px;
+        padding: 3px 8px;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.06);
+        color: rgba(233,238,247,0.85);
+        white-space: nowrap;
       }
-      .row {
-        display: flex;
-        justify-content: space-between;
+      .metric-line {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap: 8px;
         margin: 6px 0;
-        font-size: 14px;
+        color: rgba(233,238,247,0.92);
+        font-size: 13px;
       }
-      .kpi {
-        font-weight: 700;
+      .metric-left {
+        display:flex; align-items:center; gap:8px;
+        color: rgba(233,238,247,0.85);
       }
+      .metric-val {
+        font-weight: 800;
+        color: #e9eef7;
+      }
+      .alerts {
+        margin-top: 10px;
+        font-size: 12px;
+        color: rgba(233,238,247,0.85);
+      }
+      .tag {
+        display:inline-block;
+        margin-right: 6px;
+        margin-top: 6px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(255,255,255,0.06);
+      }
+      .tag-high-temp { border-color: rgba(255,107,107,0.55); color: #ffb3b3; }
+      .tag-low-hum   { border-color: rgba(116,192,252,0.55); color: #b9ddff; }
+      .tag-high-co2  { border-color: rgba(255,169,77,0.55); color: #ffd0a1; }
 
-      /* Pisca em vermelho (quando temp>30 e CO2>1000) */
+      /* Piscar em vermelho (temp > 30 e CO2 > 1000) */
       @keyframes blinkRed {
         0%   { box-shadow: 0 0 0 rgba(255,0,0,0.0); border-color: rgba(255,0,0,0.25); background: #0f1b2d; }
-        50%  { box-shadow: 0 0 30px rgba(255,0,0,0.40); border-color: rgba(255,0,0,0.95); background: rgba(255,0,0,0.18); }
+        50%  { box-shadow: 0 0 22px rgba(255,0,0,0.42); border-color: rgba(255,0,0,0.95); background: rgba(255,0,0,0.18); }
         100% { box-shadow: 0 0 0 rgba(255,0,0,0.0); border-color: rgba(255,0,0,0.25); background: #0f1b2d; }
       }
-      .blink-red {
-        animation: blinkRed 0.9s linear infinite;
-      }
+      .blink-red { animation: blinkRed 0.9s linear infinite; }
 
-      /* Alertas individuais */
-      .alert-high-temp { color: #ff6b6b; font-weight: 700; }
-      .alert-low-hum   { color: #74c0fc; font-weight: 700; }
-      .alert-high-co2  { color: #ffa94d; font-weight: 700; }
-
-      .muted {
-        color: rgba(233, 238, 247, 0.75);
-        font-size: 12px;
+      /* Ajuste para botões do Streamlit não “incharem” o layout */
+      div.stButton > button {
+        width: 100%;
+        border-radius: 14px;
+        padding: 0;
+        border: none;
+        background: transparent;
       }
+      div.stButton > button:hover { background: transparent; }
+      div.stButton > button:focus { outline: none; box-shadow: none; }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ---------- Controles ----------
-st.title("Dashboard – Temperatura, Umidade e CO₂ (10 salas)")
-st.caption("Dados fictícios com atualização automática e alertas por sala.")
+# ---------------------------
+# Funções de dados fictícios
+# ---------------------------
+def clamp(x, lo, hi):
+    return max(lo, min(hi, x))
 
-colA, colB, colC, colD = st.columns([1, 1, 1, 2])
-with colA:
-    temp_high_threshold = st.number_input("Alerta: Temp alta (°C)", value=30.0, step=0.5)
-with colB:
-    hum_low_threshold = st.number_input("Alerta: Umidade baixa (%)", value=30.0, step=1.0)
-with colC:
-    co2_high_threshold = st.number_input("Alerta: CO₂ alto (ppm)", value=1000, step=50)
-with colD:
-    refresh_s = st.slider("Atualizar a cada (segundos)", min_value=1, max_value=10, value=2)
+def init_history(now: datetime) -> pd.DataFrame:
+    # 48 pontos = 24h em intervalos de 30 min
+    times = [now - timedelta(minutes=30 * i) for i in reversed(range(48))]
+    base_temp = random.uniform(24.5, 30.5)
+    base_hum = random.uniform(25, 50)
+    base_co2 = random.uniform(650, 1100)
 
-st.divider()
+    rows = []
+    t = base_temp
+    h = base_hum
+    c = base_co2
+    for ts in times:
+        # “caminhada” suave
+        t = clamp(t + random.uniform(-0.6, 0.6), 20.0, 36.0)
+        h = clamp(h + random.uniform(-2.0, 2.0), 15.0, 70.0)
+        c = clamp(c + random.uniform(-60, 60), 450, 1600)
+        rows.append({"timestamp": ts, "temp": round(t, 1), "hum": int(round(h)), "co2": int(round(c))})
 
-# ---------- Geração de dados fictícios ----------
-def fake_room_data(room_id: int) -> dict:
-    # Ajuste as faixas para simular o comportamento desejado
-    temp = round(random.uniform(25.0, 33.5), 1)
-    hum = round(random.uniform(20.0, 55.0), 0)
-    co2 = int(random.uniform(600, 1400))
+    return pd.DataFrame(rows)
 
-    return {
-        "room": f"Sala {room_id}",
-        "temp": temp,
-        "hum": int(hum),
-        "co2": co2,
-        "timestamp": datetime.now().strftime("%H:%M:%S"),
-    }
+def update_current_from_history(df: pd.DataFrame) -> dict:
+    last = df.iloc[-1]
+    return {"temp": float(last["temp"]), "hum": int(last["hum"]), "co2": int(last["co2"])}
 
-# ---------- Loop de atualização ----------
-# Observação: Streamlit reexecuta o script; usamos auto-refresh simples via sleep + rerun.
-placeholder = st.empty()
+def step_history(df: pd.DataFrame, now: datetime) -> pd.DataFrame:
+    """
+    Atualiza o histórico simulando um novo ponto a cada 30 minutos.
+    Para demo: se passou >=30 min do último timestamp, adiciona um ponto.
+    """
+    last_ts = pd.to_datetime(df["timestamp"].iloc[-1])
+    if now - last_ts >= timedelta(minutes=30):
+        last = df.iloc[-1]
+        new_temp = clamp(float(last["temp"]) + random.uniform(-0.8, 0.8), 20.0, 36.0)
+        new_hum = clamp(int(last["hum"]) + int(random.uniform(-3, 3)), 15, 70)
+        new_co2 = clamp(int(last["co2"]) + int(random.uniform(-90, 90)), 450, 1600)
 
-while True:
-    rooms = [fake_room_data(i) for i in range(1, 11)]
+        new_row = pd.DataFrame([{
+            "timestamp": now.replace(second=0, microsecond=0),
+            "temp": round(new_temp, 1),
+            "hum": int(new_hum),
+            "co2": int(new_co2),
+        }])
 
-    # Resumo de alertas
-    high_temp = [r for r in rooms if r["temp"] > temp_high_threshold]
-    low_hum = [r for r in rooms if r["hum"] < hum_low_threshold]
-    high_co2 = [r for r in rooms if r["co2"] > co2_high_threshold]
-    critical_blink = [
-        r for r in rooms if (r["temp"] > temp_high_threshold and r["co2"] > co2_high_threshold)
-    ]
+        df = pd.concat([df, new_row], ignore_index=True)
+        # mantém últimos 48 pontos
+        if len(df) > 48:
+            df = df.iloc[-48:].reset_index(drop=True)
 
-    with placeholder.container():
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Temp alta", len(high_temp))
-        c2.metric("Umidade baixa", len(low_hum))
-        c3.metric("CO₂ acima do limite", len(high_co2))
-        c4.metric("Crítico (pisca)", len(critical_blink))
+    return df
 
-        st.markdown(
-            f"<div class='muted'>Última atualização: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</div>",
-            unsafe_allow_html=True,
-        )
+# ---------------------------
+# Estado da aplicação
+# ---------------------------
+now = datetime.now()
 
-        st.markdown("<div class='grid'>", unsafe_allow_html=True)
+if "rooms" not in st.session_state:
+    st.session_state.rooms = {}
+    for i in range(1, 11):
+        hist = init_history(now)
+        st.session_state.rooms[i] = {
+            "name": f"Sala {i}",
+            "history": hist,
+            "current": update_current_from_history(hist),
+        }
 
-        for r in rooms:
-            is_blink = (r["temp"] > temp_high_threshold and r["co2"] > co2_high_threshold)
-            card_class = "card blink-red" if is_blink else "card"
+if "selected_room" not in st.session_state:
+    st.session_state.selected_room = 1
 
-            # Alertas por regra
-            temp_alert = r["temp"] > temp_high_threshold
-            hum_alert = r["hum"] < hum_low_threshold
-            co2_alert = r["co2"] > co2_high_threshold
+# ---------------------------
+# Controles / Limiares
+# ---------------------------
+st.markdown("<div class='topbar'>", unsafe_allow_html=True)
+col1, col2, col3, col4, col5 = st.columns([1.1, 1.1, 1.2, 1.2, 2.2])
+with col1:
+    temp_thr = st.number_input("Temp alta (°C)", value=30.0, step=0.5)
+with col2:
+    hum_thr = st.number_input("Umidade baixa (%)", value=30.0, step=1.0)
+with col3:
+    co2_thr = st.number_input("CO₂ alto (ppm)", value=1000, step=50)
+with col4:
+    refresh_s = st.slider("Auto-refresh (s)", 1, 10, 2)
+with col5:
+    st.write("")
+    st.caption(f"Atualização: {now.strftime('%d/%m/%Y %H:%M:%S')}")
 
-            badges = []
+st.markdown("</div>", unsafe_allow_html=True)
+
+# Auto-refresh sem travar cliques (Streamlit moderno)
+# Se sua versão do Streamlit não tiver st.autorefresh, atualize: pip install -U streamlit
+st.autorefresh(interval=refresh_s * 1000, key="tick")
+
+# Atualiza históricos (quando completar 30 min desde o último ponto)
+for i in range(1, 11):
+    st.session_state.rooms[i]["history"] = step_history(st.session_state.rooms[i]["history"], now)
+    st.session_state.rooms[i]["current"] = update_current_from_history(st.session_state.rooms[i]["history"])
+
+# ---------------------------
+# Grid 5x2 (uma tela) – cada sala é um “quadrado” clicável
+# ---------------------------
+st.subheader("Salas (clique para ver detalhes e histórico)")
+st.markdown("<div class='gridwrap'>", unsafe_allow_html=True)
+
+room_ids = list(range(1, 11))
+rows = [room_ids[:5], room_ids[5:]]
+
+for row in rows:
+    cols = st.columns(5, gap="medium")
+    for col, rid in zip(cols, row):
+        with col:
+            room = st.session_state.rooms[rid]
+            cur = room["current"]
+
+            temp_alert = cur["temp"] > temp_thr
+            hum_alert = cur["hum"] < hum_thr
+            co2_alert = cur["co2"] > co2_thr
+            blink = temp_alert and co2_alert
+
+            tags = []
             if temp_alert:
-                badges.append("<span class='alert-high-temp'>Temp alta</span>")
+                tags.append("<span class='tag tag-high-temp'>Temp alta</span>")
             if hum_alert:
-                badges.append("<span class='alert-low-hum'>Umidade baixa</span>")
+                tags.append("<span class='tag tag-low-hum'>Umidade baixa</span>")
             if co2_alert:
-                badges.append("<span class='alert-high-co2'>CO₂ alto</span>")
+                tags.append("<span class='tag tag-high-co2'>CO₂ alto</span>")
+            tags_html = "".join(tags) if tags else "<span class='tag'>Sem alertas</span>"
 
-            badge_html = " | ".join(badges) if badges else "<span class='muted'>Sem alertas</span>"
+            card_class = "room-card blink-red" if blink else "room-card"
 
+            # Botão “invisível” que envolve o card (clique na sala)
+            if st.button(f"{room['name']}", key=f"room_btn_{rid}"):
+                st.session_state.selected_room = rid
+
+            # Render do card (aproveita o espaço do botão acima)
             st.markdown(
                 f"""
                 <div class="{card_class}">
-                  <div class="title">
-                    <span>{r["room"]}</span>
-                    <span class="badge">{r["timestamp"]}</span>
+                  <div class="room-title">
+                    <span>{room['name']}</span>
+                    <span class="badge">agora</span>
                   </div>
 
-                  <div class="row"><span>Temperatura</span><span class="kpi">{r["temp"]} °C</span></div>
-                  <div class="row"><span>Umidade</span><span class="kpi">{r["hum"]}%</span></div>
-                  <div class="row"><span>CO₂</span><span class="kpi">{r["co2"]} ppm</span></div>
+                  <div class="metric-line">
+                    <span class="metric-left">{svg_icon("temp")} Temperatura</span>
+                    <span class="metric-val">{cur["temp"]:.1f} °C</span>
+                  </div>
 
-                  <div class="row" style="margin-top:10px;">
-                    <span class="muted">Alertas</span>
-                    <span>{badge_html}</span>
+                  <div class="metric-line">
+                    <span class="metric-left">{svg_icon("hum")} Umidade</span>
+                    <span class="metric-val">{cur["hum"]}%</span>
+                  </div>
+
+                  <div class="metric-line">
+                    <span class="metric-left">{svg_icon("co2")} CO₂</span>
+                    <span class="metric-val">{cur["co2"]} ppm</span>
+                  </div>
+
+                  <div class="alerts">
+                    {tags_html}
                   </div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-        st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
-    time.sleep(refresh_s)
-    st.rerun()
+st.divider()
+
+# ---------------------------
+# Visão detalhada (ao clicar em uma sala)
+# ---------------------------
+sel = st.session_state.selected_room
+room = st.session_state.rooms[sel]
+hist = room["history"].copy()
+hist["timestamp"] = pd.to_datetime(hist["timestamp"])
+
+st.subheader(f"Detalhes – {room['name']} (histórico a cada 30 min)")
+
+k1, k2, k3, k4 = st.columns([1, 1, 1, 2])
+k1.metric("Temperatura (agora)", f"{room['current']['temp']:.1f} °C")
+k2.metric("Umidade (agora)", f"{room['current']['hum']}%")
+k3.metric("CO₂ (agora)", f"{room['current']['co2']} ppm")
+k4.caption("O histórico é simulado em pontos de 30 minutos (últimas 24h).")
+
+tabs = st.tabs(["Temperatura", "Umidade", "CO₂", "Tabela"])
+with tabs[0]:
+    st.line_chart(hist.set_index("timestamp")["temp"])
+with tabs[1]:
+    st.line_chart(hist.set_index("timestamp")["hum"])
+with tabs[2]:
+    st.line_chart(hist.set_index("timestamp")["co2"])
+with tabs[3]:
+    st.dataframe(hist.sort_values("timestamp", ascending=False), use_container_width=True)
