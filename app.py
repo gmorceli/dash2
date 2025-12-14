@@ -2,6 +2,7 @@
 # Dashboard de 10 salas (grid 5x2) + ícones + detalhe com histórico (30 min)
 
 import random
+import time
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -334,3 +335,5 @@ with tabs[2]:
     st.line_chart(hist.set_index("timestamp")["co2"])
 with tabs[3]:
     st.dataframe(hist.sort_values("timestamp", ascending=False), use_container_width=True)
+time.sleep(refresh_s)
+st.rerun()
