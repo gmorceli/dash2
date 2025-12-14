@@ -241,9 +241,10 @@ st.markdown(
         {tags_html}
       </div>
     </div>
-    """),
+    """)
+    )
 st.markdown(html_card, unsafe_allow_html=True)
-)
+
 
 # Auto-refresh sem travar cliques (Streamlit moderno)
 # Se sua versão do Streamlit não tiver st.autorefresh, atualize: pip install -U streamlit
