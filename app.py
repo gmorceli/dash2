@@ -214,35 +214,34 @@ if "selected_room" not in st.session_state:
 # ---------------------------
 # Controles / Limiares
 # ---------------------------
-st.markdown(
- html_card = dedent(f"""
-    <div class="{card_class}">
-      <div class="room-title">
-        <span>{room['name']}</span>
-        <span class="badge">agora</span>
-      </div>
 
-      <div class="metric-line">
-        <span class="metric-left">{svg_icon("temp")} Temperatura</span>
-        <span class="metric-val">{cur["temp"]:.1f} °C</span>
-      </div>
+html_card = dedent(f"""
+<div class="{card_class}">
+  <div class="room-title">
+    <span>{room['name']}</span>
+    <span class="badge">agora</span>
+  </div>
 
-      <div class="metric-line">
-        <span class="metric-left">{svg_icon("hum")} Umidade</span>
-        <span class="metric-val">{cur["hum"]}%</span>
-      </div>
+  <div class="metric-line">
+    <span class="metric-left">{svg_icon("temp")} Temperatura</span>
+    <span class="metric-val">{cur["temp"]:.1f} °C</span>
+  </div>
 
-      <div class="metric-line">
-        <span class="metric-left">{svg_icon("co2")} CO₂</span>
-        <span class="metric-val">{cur["co2"]} ppm</span>
-      </div>
+  <div class="metric-line">
+    <span class="metric-left">{svg_icon("hum")} Umidade</span>
+    <span class="metric-val">{cur["hum"]}%</span>
+  </div>
 
-      <div class="alerts">
-        {tags_html}
-      </div>
-    </div>
-    """)
-    )
+  <div class="metric-line">
+    <span class="metric-left">{svg_icon("co2")} CO₂</span>
+    <span class="metric-val">{cur["co2"]} ppm</span>
+  </div>
+
+  <div class="alerts">
+    {tags_html}
+  </div>
+</div>
+""")
 st.markdown(html_card, unsafe_allow_html=True)
 
 
