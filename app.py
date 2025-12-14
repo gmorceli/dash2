@@ -18,29 +18,27 @@ st.set_page_config(page_title="Dashboard Salas – Clima & CO₂", layout="wide"
 # SVGs inline (ícones)
 # ---------------------------
 def svg_icon(kind: str, size: int = 18) -> str:
-    # Ícones simples em SVG (sem dependência externa)
     if kind == "temp":
-        svg = f"""
-        <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
-          <path d="M14 14.76V5a2 2 0 10-4 0v9.76a4 4 0 104 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          <path d="M10 14.5V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        """
-    elif kind == "hum":
-        svg = f"""
-        <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2s7 7.2 7 12a7 7 0 11-14 0c0-4.8 7-12 7-12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-        </svg>
-        """
-    else:  # co2
-        svg = f"""
-        <svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
-          <path d="M4 14c0 4 4 7 8 7s8-3 8-7-4-7-8-7-8 3-8 7Z" stroke="currentColor" stroke-width="2"/>
-          <path d="M8 12h1.5a1.5 1.5 0 010 3H8v-3Z" stroke="currentColor" stroke-width="2"/>
-          <path d="M16 12h-1.5a1.5 1.5 0 000 3H16v-3Z" stroke="currentColor" stroke-width="2"/>
-        </svg>
-        """
-    return svg
+        return f"""
+<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
+  <path d="M14 14.76V5a2 2 0 10-4 0v9.76a4 4 0 104 0Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <path d="M10 14.5V5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>
+"""
+    if kind == "hum":
+        return f"""
+<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
+  <path d="M12 2s7 7.2 7 12a7 7 0 11-14 0c0-4.8 7-12 7-12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+</svg>
+"""
+    # co2
+    return f"""
+<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none">
+  <path d="M4 14c0 4 4 7 8 7s8-3 8-7-4-7-8-7-8 3-8 7Z" stroke="currentColor" stroke-width="2"/>
+  <path d="M8 12h1.5a1.5 1.5 0 010 3H8v-3Z" stroke="currentColor" stroke-width="2"/>
+  <path d="M16 12h-1.5a1.5 1.5 0 000 3H16v-3Z" stroke="currentColor" stroke-width="2"/>
+</svg>
+"""
 
 # ---------------------------
 # CSS – grid + cards + blink
@@ -51,7 +49,6 @@ st.markdown(
       .topbar { margin-bottom: 10px; }
       .gridwrap { margin-top: 6px; }
 
-      /* Card */
       .room-card {
         background: #0f1b2d;
         border: 1px solid rgba(255,255,255,0.10);
@@ -92,15 +89,9 @@ st.markdown(
         display:flex; align-items:center; gap:8px;
         color: rgba(233,238,247,0.85);
       }
-      .metric-val {
-        font-weight: 800;
-        color: #e9eef7;
-      }
-      .alerts {
-        margin-top: 10px;
-        font-size: 12px;
-        color: rgba(233,238,247,0.85);
-      }
+      .metric-val { font-weight: 800; color: #e9eef7; }
+
+      .alerts { margin-top: 10px; font-size: 12px; color: rgba(233,238,247,0.85); }
       .tag {
         display:inline-block;
         margin-right: 6px;
@@ -114,7 +105,6 @@ st.markdown(
       .tag-low-hum   { border-color: rgba(116,192,252,0.55); color: #b9ddff; }
       .tag-high-co2  { border-color: rgba(255,169,77,0.55); color: #ffd0a1; }
 
-      /* Piscar em vermelho (temp > 30 e CO2 > 1000) */
       @keyframes blinkRed {
         0%   { box-shadow: 0 0 0 rgba(255,0,0,0.0); border-color: rgba(255,0,0,0.25); background: #0f1b2d; }
         50%  { box-shadow: 0 0 22px rgba(255,0,0,0.42); border-color: rgba(255,0,0,0.95); background: rgba(255,0,0,0.18); }
@@ -122,7 +112,6 @@ st.markdown(
       }
       .blink-red { animation: blinkRed 0.9s linear infinite; }
 
-      /* Ajuste para botões do Streamlit não “incharem” o layout */
       div.stButton > button {
         width: 100%;
         border-radius: 14px;
@@ -144,23 +133,18 @@ def clamp(x, lo, hi):
     return max(lo, min(hi, x))
 
 def init_history(now: datetime) -> pd.DataFrame:
-    # 48 pontos = 24h em intervalos de 30 min
     times = [now - timedelta(minutes=30 * i) for i in reversed(range(48))]
     base_temp = random.uniform(24.5, 30.5)
     base_hum = random.uniform(25, 50)
     base_co2 = random.uniform(650, 1100)
 
     rows = []
-    t = base_temp
-    h = base_hum
-    c = base_co2
+    t, h, c = base_temp, base_hum, base_co2
     for ts in times:
-        # “caminhada” suave
         t = clamp(t + random.uniform(-0.6, 0.6), 20.0, 36.0)
         h = clamp(h + random.uniform(-2.0, 2.0), 15.0, 70.0)
         c = clamp(c + random.uniform(-60, 60), 450, 1600)
         rows.append({"timestamp": ts, "temp": round(t, 1), "hum": int(round(h)), "co2": int(round(c))})
-
     return pd.DataFrame(rows)
 
 def update_current_from_history(df: pd.DataFrame) -> dict:
@@ -168,10 +152,6 @@ def update_current_from_history(df: pd.DataFrame) -> dict:
     return {"temp": float(last["temp"]), "hum": int(last["hum"]), "co2": int(last["co2"])}
 
 def step_history(df: pd.DataFrame, now: datetime) -> pd.DataFrame:
-    """
-    Atualiza o histórico simulando um novo ponto a cada 30 minutos.
-    Para demo: se passou >=30 min do último timestamp, adiciona um ponto.
-    """
     last_ts = pd.to_datetime(df["timestamp"].iloc[-1])
     if now - last_ts >= timedelta(minutes=30):
         last = df.iloc[-1]
@@ -187,10 +167,8 @@ def step_history(df: pd.DataFrame, now: datetime) -> pd.DataFrame:
         }])
 
         df = pd.concat([df, new_row], ignore_index=True)
-        # mantém últimos 48 pontos
         if len(df) > 48:
             df = df.iloc[-48:].reset_index(drop=True)
-
     return df
 
 # ---------------------------
@@ -214,40 +192,17 @@ if "selected_room" not in st.session_state:
 # ---------------------------
 # Controles / Limiares
 # ---------------------------
-
-html_card = dedent(f"""
-<div class="{card_class}">
-  <div class="room-title">
-    <span>{room['name']}</span>
-    <span class="badge">agora</span>
-  </div>
-
-  <div class="metric-line">
-    <span class="metric-left">{svg_icon("temp")} Temperatura</span>
-    <span class="metric-val">{cur["temp"]:.1f} °C</span>
-  </div>
-
-  <div class="metric-line">
-    <span class="metric-left">{svg_icon("hum")} Umidade</span>
-    <span class="metric-val">{cur["hum"]}%</span>
-  </div>
-
-  <div class="metric-line">
-    <span class="metric-left">{svg_icon("co2")} CO₂</span>
-    <span class="metric-val">{cur["co2"]} ppm</span>
-  </div>
-
-  <div class="alerts">
-    {tags_html}
-  </div>
-</div>
-""")
-st.markdown(html_card, unsafe_allow_html=True)
-
-
-# Auto-refresh sem travar cliques (Streamlit moderno)
-# Se sua versão do Streamlit não tiver st.autorefresh, atualize: pip install -U streamlit
-#st.autorefresh(interval=refresh_s * 1000, key="tick")
+c1, c2, c3, c4, c5 = st.columns([1.1, 1.1, 1.2, 1.2, 2.4])
+with c1:
+    temp_thr = st.number_input("Temp alta (°C)", value=30.0, step=0.5)
+with c2:
+    hum_thr = st.number_input("Umidade baixa (%)", value=30.0, step=1.0)
+with c3:
+    co2_thr = st.number_input("CO₂ alto (ppm)", value=1000, step=50)
+with c4:
+    refresh_s = st.slider("Atualizar a cada (s)", 1, 10, 2)
+with c5:
+    st.caption(f"Atualização: {now.strftime('%d/%m/%Y %H:%M:%S')}")
 
 # Atualiza históricos (quando completar 30 min desde o último ponto)
 for i in range(1, 11):
@@ -255,7 +210,7 @@ for i in range(1, 11):
     st.session_state.rooms[i]["current"] = update_current_from_history(st.session_state.rooms[i]["history"])
 
 # ---------------------------
-# Grid 5x2 (uma tela) – cada sala é um “quadrado” clicável
+# Grid 5x2
 # ---------------------------
 st.subheader("Salas (clique para ver detalhes e histórico)")
 st.markdown("<div class='gridwrap'>", unsafe_allow_html=True)
@@ -286,48 +241,44 @@ for row in rows:
 
             card_class = "room-card blink-red" if blink else "room-card"
 
-            # Botão “invisível” que envolve o card (clique na sala)
-            if st.button(f"{room['name']}", key=f"room_btn_{rid}"):
+            if st.button(room["name"], key=f"room_btn_{rid}"):
                 st.session_state.selected_room = rid
 
-            # Render do card (aproveita o espaço do botão acima)
-            st.markdown(
-                f"""
-                <div class="{card_class}">
-                  <div class="room-title">
-                    <span>{room['name']}</span>
-                    <span class="badge">agora</span>
-                  </div>
+            html_card = dedent(f"""
+<div class="{card_class}">
+  <div class="room-title">
+    <span>{room['name']}</span>
+    <span class="badge">agora</span>
+  </div>
 
-                  <div class="metric-line">
-                    <span class="metric-left">{svg_icon("temp")} Temperatura</span>
-                    <span class="metric-val">{cur["temp"]:.1f} °C</span>
-                  </div>
+  <div class="metric-line">
+    <span class="metric-left">{svg_icon("temp")} Temperatura</span>
+    <span class="metric-val">{cur["temp"]:.1f} °C</span>
+  </div>
 
-                  <div class="metric-line">
-                    <span class="metric-left">{svg_icon("hum")} Umidade</span>
-                    <span class="metric-val">{cur["hum"]}%</span>
-                  </div>
+  <div class="metric-line">
+    <span class="metric-left">{svg_icon("hum")} Umidade</span>
+    <span class="metric-val">{cur["hum"]}%</span>
+  </div>
 
-                  <div class="metric-line">
-                    <span class="metric-left">{svg_icon("co2")} CO₂</span>
-                    <span class="metric-val">{cur["co2"]} ppm</span>
-                  </div>
+  <div class="metric-line">
+    <span class="metric-left">{svg_icon("co2")} CO₂</span>
+    <span class="metric-val">{cur["co2"]} ppm</span>
+  </div>
 
-                  <div class="alerts">
-                    {tags_html}
-                  </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+  <div class="alerts">
+    {tags_html}
+  </div>
+</div>
+""")
+            st.markdown(html_card, unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.divider()
 
 # ---------------------------
-# Visão detalhada (ao clicar em uma sala)
+# Visão detalhada
 # ---------------------------
 sel = st.session_state.selected_room
 room = st.session_state.rooms[sel]
@@ -351,5 +302,6 @@ with tabs[2]:
     st.line_chart(hist.set_index("timestamp")["co2"])
 with tabs[3]:
     st.dataframe(hist.sort_values("timestamp", ascending=False), use_container_width=True)
-#time.sleep(refresh_s)
-#st.rerun()
+
+time.sleep(refresh_s)
+st.rerun()
