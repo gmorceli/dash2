@@ -4,6 +4,7 @@
 import random
 import time
 from datetime import datetime, timedelta
+from textwrap import dedent
 
 import pandas as pd
 import streamlit as st
@@ -213,21 +214,36 @@ if "selected_room" not in st.session_state:
 # ---------------------------
 # Controles / Limiares
 # ---------------------------
-st.markdown("<div class='topbar'>", unsafe_allow_html=True)
-col1, col2, col3, col4, col5 = st.columns([1.1, 1.1, 1.2, 1.2, 2.2])
-with col1:
-    temp_thr = st.number_input("Temp alta (°C)", value=30.0, step=0.5)
-with col2:
-    hum_thr = st.number_input("Umidade baixa (%)", value=30.0, step=1.0)
-with col3:
-    co2_thr = st.number_input("CO₂ alto (ppm)", value=1000, step=50)
-with col4:
-    refresh_s = st.slider("Auto-refresh (s)", 1, 10, 2)
-with col5:
-    st.write("")
-    st.caption(f"Atualização: {now.strftime('%d/%m/%Y %H:%M:%S')}")
+st.markdown(
+    dedent(f"""
+    <div class="{card_class}">
+      <div class="room-title">
+        <span>{room['name']}</span>
+        <span class="badge">agora</span>
+      </div>
 
-st.markdown("</div>", unsafe_allow_html=True)
+      <div class="metric-line">
+        <span class="metric-left">{svg_icon("temp")} Temperatura</span>
+        <span class="metric-val">{cur["temp"]:.1f} °C</span>
+      </div>
+
+      <div class="metric-line">
+        <span class="metric-left">{svg_icon("hum")} Umidade</span>
+        <span class="metric-val">{cur["hum"]}%</span>
+      </div>
+
+      <div class="metric-line">
+        <span class="metric-left">{svg_icon("co2")} CO₂</span>
+        <span class="metric-val">{cur["co2"]} ppm</span>
+      </div>
+
+      <div class="alerts">
+        {tags_html}
+      </div>
+    </div>
+    """),
+    unsafe_allow_html=True,
+)
 
 # Auto-refresh sem travar cliques (Streamlit moderno)
 # Se sua versão do Streamlit não tiver st.autorefresh, atualize: pip install -U streamlit
